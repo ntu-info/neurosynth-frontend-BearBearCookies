@@ -297,7 +297,24 @@
                 return;
             }
 
-            const terms = Array.isArray(data) ? data : (data.terms || []);
+            // IMPROVED: Handle multiple response formats from the API
+            let terms = [];
+            
+            if (Array.isArray(data)) {
+                // If data is already an array, use it directly
+                terms = data;
+            } else if (data && typeof data === 'object') {
+                // If data is an object, try multiple possible property names
+                terms = data.terms || data.results || data.data || [];
+                
+                // If still empty, try to extract values from the object
+                if (terms.length === 0) {
+                    terms = Object.values(data).filter(v => 
+                        typeof v === 'string' || (typeof v === 'object' && (v.term || v.name))
+                    );
+                }
+            }
+
             termsCount.textContent = `${terms.length} terms`;
 
             const termsHTML = terms.map(term => `
