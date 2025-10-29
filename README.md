@@ -1,7 +1,7 @@
 # Neuroscience Research Explorer - AJAX Frontend
 
 ## 🧠 Live Demo
-[View Live Frontend](https://github.com/ntu-info/neurosynth-frontend-BearBearCookies)
+[View Live Frontend](https://ntu-info.github.io/neurosynth-frontend-BearBearCookies/)
 
 ## 📋 Project Description
 A modern, responsive AJAX-based frontend for exploring neuroscience research terms and studies. Built with Tailwind CSS and vanilla JavaScript for real-time search without page refresh.
