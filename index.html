@@ -304,32 +304,54 @@
                 // e.g., ["fear","anxiety", ...]
                 terms = data;
             } else if (data && typeof data === 'object') {
-                // First try common keys that already return arrays
-                if (Array.isArray(data.terms)) terms = data.terms;
+                // If data is an object, accept arrays under common keys or under the term key itself
+                if (Array.isArray(data.terms))        terms = data.terms;
                 else if (Array.isArray(data.results)) terms = data.results;
-                else if (Array.isArray(data.data)) terms = data.data;
+                else if (Array.isArray(data.data))    terms = data.data;
                 else {
-                    // Fallback: flatten whatever the object holds
+                    // Fallbacks that cover:
+                    // { "<term>": ["t2","t3",...]}  OR  { "<term>": { associated_terms/co_terms/terms/neighbors: [...] } }
                     const vals = Object.values(data);
                     terms = vals.flatMap(v => {
-                        if (Array.isArray(v)) return v;                       // <-- FIX: keep arrays
+                        if (Array.isArray(v)) return v;
+
+                        if (v && typeof v === 'object') {
+                            for (const k of ['associated_terms', 'co_terms', 'terms', 'neighbors']) {
+                                if (Array.isArray(v[k])) return v[k];
+                            }
+                        }
+
                         if (typeof v === 'string') return [v];
                         if (v && typeof v === 'object' && (v.term || v.name)) return [v.term || v.name];
+
                         return [];
                     });
                 }
             }
 
+            // Normalize to strings and de-duplicate
+            terms = Array.from(new Set(
+                terms.map(t => typeof t === 'object' ? (t.term || t.name || JSON.stringify(t)) : String(t))
+            ));
+
+            if (terms.length === 0) {
+                termsResults.innerHTML = `
+                    <p class="text-gray-400 text-center py-4">
+                        No terms to display
+                    </p>
+                `;
+                return;
+            }
 
             termsCount.textContent = `${terms.length} terms`;
 
             const termsHTML = terms.map(term => `
                 <span class="term-badge inline-block px-3 py-1 m-1 bg-gradient-to-r from-blue-100 to-blue-200 text-blue-700 rounded-full text-sm font-medium cursor-pointer hover:from-blue-200 hover:to-blue-300">
-                    ${typeof term === 'object' ? (term.term || term.name || JSON.stringify(term)) : term}
+                    ${term}
                 </span>
             `).join('');
 
-            termsResults.innerHTML = termsHTML || '<p class="text-gray-400 text-center py-4">No terms to display</p>';
+            termsResults.innerHTML = termsHTML;
 
             // Add click handlers to term badges
             termsResults.querySelectorAll('.term-badge').forEach(badge => {
