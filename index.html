@@ -1,46 +1,449 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Fetch /terms Demo</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neuroscience Research Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @keyframes pulse-subtle {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.8; }
+        }
+        .loading-pulse {
+            animation: pulse-subtle 1.5s ease-in-out infinite;
+        }
+        .term-badge {
+            transition: all 0.3s ease;
+        }
+        .term-badge:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .study-card {
+            transition: all 0.3s ease;
+        }
+        .study-card:hover {
+            transform: translateX(5px);
+        }
+    </style>
 </head>
-<body>
-  <h1>Fetch https://mil.psy.ntu.edu.tw:5000/terms</h1>
-  <button id="btn">Fetch again</button>
-  <pre id="out">Loading…</pre>
+<body class="bg-gradient-to-br from-blue-50 via-white to-purple-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- Header -->
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 mb-3">
+                <i class="fas fa-brain text-purple-500 mr-3"></i>
+                Neuroscience Research Explorer
+            </h1>
+            <p class="text-gray-600">Real-time search across neuroscience terms and studies</p>
+        </header>
 
-  <script>
-    async function fetchTerms() {
-      const out = document.getElementById('out');
-      out.textContent = 'Requesting…';
-      try {
-        const resp = await fetch('https://mil.psy.ntu.edu.tw:5000/terms');
-        let info = `HTTP ${resp.status} ${resp.statusText}\n`;
-        const ct = resp.headers.get('content-type') || '';
+        <!-- Search Section -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
+            <div class="mb-6">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    <i class="fas fa-search text-blue-500 mr-2"></i>
+                    Search Terms & Studies
+                </label>
+                <div class="relative">
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        placeholder="Try 'amygdala' or 'amygdala not emotion'"
+                        class="w-full px-4 py-3 pr-12 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none transition-colors text-lg"
+                    >
+                    <div id="loadingSpinner" class="absolute right-3 top-3.5 hidden">
+                        <div class="w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                </div>
+                <div class="mt-2 flex gap-2">
+                    <span class="text-xs text-gray-500">
+                        <i class="fas fa-info-circle"></i>
+                        Supports logical operators: AND, OR, NOT
+                    </span>
+                </div>
+            </div>
 
-        if (!resp.ok) {
-          const text = await resp.text();
-          out.textContent = info + '\n' + text;
-          return;
+            <!-- Search Mode Toggle -->
+            <div class="flex gap-4 mb-4">
+                <label class="flex items-center cursor-pointer">
+                    <input type="checkbox" id="enableTerms" checked class="mr-2">
+                    <span class="text-sm font-medium text-gray-700">Search Terms</span>
+                </label>
+                <label class="flex items-center cursor-pointer">
+                    <input type="checkbox" id="enableStudies" checked class="mr-2">
+                    <span class="text-sm font-medium text-gray-700">Search Studies</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Results Container -->
+        <div class="grid lg:grid-cols-2 gap-6">
+            <!-- Terms Results -->
+            <div id="termsSection" class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-tags text-blue-500 mr-2"></i>
+                    Associated Terms
+                    <span id="termsCount" class="ml-auto text-sm font-normal text-gray-500"></span>
+                </h2>
+                <div id="termsLoading" class="hidden">
+                    <div class="flex items-center justify-center py-8">
+                        <div class="loading-pulse text-blue-500">
+                            <i class="fas fa-brain fa-3x"></i>
+                        </div>
+                    </div>
+                </div>
+                <div id="termsResults" class="max-h-96 overflow-y-auto">
+                    <p class="text-gray-400 text-center py-8">Start typing to search terms...</p>
+                </div>
+            </div>
+
+            <!-- Studies Results -->
+            <div id="studiesSection" class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-book-medical text-purple-500 mr-2"></i>
+                    Related Studies
+                    <span id="studiesCount" class="ml-auto text-sm font-normal text-gray-500"></span>
+                </h2>
+                <div id="studiesLoading" class="hidden">
+                    <div class="flex items-center justify-center py-8">
+                        <div class="loading-pulse text-purple-500">
+                            <i class="fas fa-microscope fa-3x"></i>
+                        </div>
+                    </div>
+                </div>
+                <div id="studiesResults" class="max-h-96 overflow-y-auto">
+                    <p class="text-gray-400 text-center py-8">Start typing to search studies...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- All Terms Explorer -->
+        <div class="mt-8 bg-white rounded-xl shadow-lg p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold text-gray-800">
+                    <i class="fas fa-list text-green-500 mr-2"></i>
+                    Browse All Terms
+                </h2>
+                <button id="loadAllTerms" class="px-4 py-2 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-lg hover:shadow-lg transition-all">
+                    <i class="fas fa-download mr-2"></i>
+                    Load All Terms
+                </button>
+            </div>
+            <div id="allTermsResults" class="hidden max-h-64 overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = 'https://mil.psy.ntu.edu.tw:5000';
+        const DEBOUNCE_DELAY = 500; // milliseconds
+        
+        // State
+        let searchTimeout;
+        let currentSearchTerm = '';
+        let abortControllers = {
+            terms: null,
+            studies: null
+        };
+
+        // DOM Elements
+        const searchInput = document.getElementById('searchInput');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const termsResults = document.getElementById('termsResults');
+        const studiesResults = document.getElementById('studiesResults');
+        const termsLoading = document.getElementById('termsLoading');
+        const studiesLoading = document.getElementById('studiesLoading');
+        const termsCount = document.getElementById('termsCount');
+        const studiesCount = document.getElementById('studiesCount');
+        const enableTerms = document.getElementById('enableTerms');
+        const enableStudies = document.getElementById('enableStudies');
+        const loadAllTermsBtn = document.getElementById('loadAllTerms');
+        const allTermsResults = document.getElementById('allTermsResults');
+
+        // Utility Functions
+        function debounce(func, wait) {
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(searchTimeout);
+                    func(...args);
+                };
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(later, wait);
+            };
         }
 
-        if (ct.includes('application/json')) {
-          const data = await resp.json();
-          out.textContent = info + '\n' + JSON.stringify(data, null, 2);
-        } else {
-          const text = await resp.text();
-          out.textContent = info + '\n' + text;
+        function encodeQueryString(query) {
+            // Handle logical operators
+            return encodeURIComponent(query)
+                .replace(/%20AND%20/g, '%20and%20')
+                .replace(/%20OR%20/g, '%20or%20')
+                .replace(/%20NOT%20/g, '%20not%20');
         }
-      } catch (err) {
-        document.getElementById('out').textContent =
-          'Error: ' + (err && err.message ? err.message : String(err)) +
-          '\n\nCommon causes:\n1) CORS not allowed by the server\n2) Opening this file via file:// instead of a local server\n3) Network/server issues';
-      }
-    }
 
-    document.getElementById('btn').addEventListener('click', fetchTerms);
-    fetchTerms();
-  </script>
+        function showLoading(type, show) {
+            if (type === 'terms') {
+                termsLoading.classList.toggle('hidden', !show);
+            } else if (type === 'studies') {
+                studiesLoading.classList.toggle('hidden', !show);
+            }
+            loadingSpinner.classList.toggle('hidden', !show);
+        }
+
+        // API Functions
+        async function fetchTerms(term) {
+            // Cancel previous request
+            if (abortControllers.terms) {
+                abortControllers.terms.abort();
+            }
+            abortControllers.terms = new AbortController();
+
+            showLoading('terms', true);
+            termsResults.innerHTML = '';
+            termsCount.textContent = '';
+
+            try {
+                const response = await fetch(`${API_BASE}/terms/${encodeURIComponent(term)}`, {
+                    signal: abortControllers.terms.signal
+                });
+                
+                if (!response.ok) throw new Error('Failed to fetch terms');
+                
+                const data = await response.json();
+                displayTerms(data);
+            } catch (error) {
+                if (error.name !== 'AbortError') {
+                    termsResults.innerHTML = `
+                        <div class="text-red-500 text-center py-4">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            Error loading terms
+                        </div>
+                    `;
+                }
+            } finally {
+                showLoading('terms', false);
+            }
+        }
+
+        async function fetchStudies(query) {
+            // Cancel previous request
+            if (abortControllers.studies) {
+                abortControllers.studies.abort();
+            }
+            abortControllers.studies = new AbortController();
+
+            showLoading('studies', true);
+            studiesResults.innerHTML = '';
+            studiesCount.textContent = '';
+
+            try {
+                const encodedQuery = encodeQueryString(query);
+                const response = await fetch(`${API_BASE}/query/${encodedQuery}/studies`, {
+                    signal: abortControllers.studies.signal
+                });
+                
+                if (!response.ok) throw new Error('Failed to fetch studies');
+                
+                const data = await response.json();
+                displayStudies(data);
+            } catch (error) {
+                if (error.name !== 'AbortError') {
+                    studiesResults.innerHTML = `
+                        <div class="text-red-500 text-center py-4">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            Error loading studies
+                        </div>
+                    `;
+                }
+            } finally {
+                showLoading('studies', false);
+            }
+        }
+
+        async function fetchAllTerms() {
+            loadAllTermsBtn.disabled = true;
+            loadAllTermsBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Loading...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/terms`);
+                if (!response.ok) throw new Error('Failed to fetch all terms');
+                
+                const data = await response.json();
+                displayAllTerms(data);
+            } catch (error) {
+                allTermsResults.innerHTML = `
+                    <div class="text-red-500 text-center py-4">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        Error loading terms
+                    </div>
+                `;
+                allTermsResults.classList.remove('hidden');
+            } finally {
+                loadAllTermsBtn.disabled = false;
+                loadAllTermsBtn.innerHTML = '<i class="fas fa-download mr-2"></i>Load All Terms';
+            }
+        }
+
+        // Display Functions
+        function displayTerms(data) {
+            if (!data || (Array.isArray(data) && data.length === 0)) {
+                termsResults.innerHTML = `
+                    <p class="text-gray-400 text-center py-4">
+                        No associated terms found
+                    </p>
+                `;
+                return;
+            }
+
+            const terms = Array.isArray(data) ? data : (data.terms || []);
+            termsCount.textContent = `${terms.length} terms`;
+
+            const termsHTML = terms.map(term => `
+                <span class="term-badge inline-block px-3 py-1 m-1 bg-gradient-to-r from-blue-100 to-blue-200 text-blue-700 rounded-full text-sm font-medium cursor-pointer hover:from-blue-200 hover:to-blue-300">
+                    ${typeof term === 'object' ? (term.term || term.name || JSON.stringify(term)) : term}
+                </span>
+            `).join('');
+
+            termsResults.innerHTML = termsHTML || '<p class="text-gray-400 text-center py-4">No terms to display</p>';
+
+            // Add click handlers to term badges
+            termsResults.querySelectorAll('.term-badge').forEach(badge => {
+                badge.addEventListener('click', () => {
+                    searchInput.value = badge.textContent.trim();
+                    performSearch();
+                });
+            });
+        }
+
+        function displayStudies(data) {
+            if (!data || (Array.isArray(data) && data.length === 0)) {
+                studiesResults.innerHTML = `
+                    <p class="text-gray-400 text-center py-4">
+                        No studies found
+                    </p>
+                `;
+                return;
+            }
+
+            const studies = Array.isArray(data) ? data : (data.studies || data.results || []);
+            studiesCount.textContent = `${studies.length} studies`;
+
+            const studiesHTML = studies.map((study, index) => {
+                // Handle different possible data structures
+                const title = study.title || study.name || `Study ${index + 1}`;
+                const authors = study.authors || study.author || '';
+                const year = study.year || study.date || '';
+                const doi = study.doi || study.id || '';
+
+                return `
+                    <div class="study-card border-l-4 border-purple-500 pl-4 py-3 mb-3 hover:bg-purple-50">
+                        <h3 class="font-semibold text-gray-800">${title}</h3>
+                        ${authors ? `<p class="text-sm text-gray-600">${authors}</p>` : ''}
+                        <div class="flex gap-4 mt-1">
+                            ${year ? `<span class="text-xs text-gray-500"><i class="far fa-calendar mr-1"></i>${year}</span>` : ''}
+                            ${doi ? `<span class="text-xs text-gray-500"><i class="fas fa-fingerprint mr-1"></i>${doi}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            studiesResults.innerHTML = studiesHTML || '<p class="text-gray-400 text-center py-4">No studies to display</p>';
+        }
+
+        function displayAllTerms(data) {
+            if (!data || (Array.isArray(data) && data.length === 0)) {
+                allTermsResults.innerHTML = `
+                    <p class="text-gray-400 text-center py-4">
+                        No terms available
+                    </p>
+                `;
+                allTermsResults.classList.remove('hidden');
+                return;
+            }
+
+            const terms = Array.isArray(data) ? data : (data.terms || []);
+            
+            const termsHTML = `
+                <div class="flex flex-wrap gap-2">
+                    ${terms.map(term => `
+                        <span class="inline-block px-3 py-1 bg-gradient-to-r from-green-100 to-blue-100 text-green-700 rounded-full text-sm font-medium cursor-pointer hover:from-green-200 hover:to-blue-200 transition-all">
+                            ${typeof term === 'object' ? (term.term || term.name || JSON.stringify(term)) : term}
+                        </span>
+                    `).join('')}
+                </div>
+                <p class="text-sm text-gray-500 mt-3">Total: ${terms.length} terms</p>
+            `;
+
+            allTermsResults.innerHTML = termsHTML;
+            allTermsResults.classList.remove('hidden');
+
+            // Add click handlers
+            allTermsResults.querySelectorAll('span').forEach(badge => {
+                badge.addEventListener('click', () => {
+                    searchInput.value = badge.textContent.trim();
+                    performSearch();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
+            });
+        }
+
+        // Main search function
+        function performSearch() {
+            const query = searchInput.value.trim();
+            
+            if (!query) {
+                termsResults.innerHTML = '<p class="text-gray-400 text-center py-8">Start typing to search terms...</p>';
+                studiesResults.innerHTML = '<p class="text-gray-400 text-center py-8">Start typing to search studies...</p>';
+                termsCount.textContent = '';
+                studiesCount.textContent = '';
+                return;
+            }
+
+            currentSearchTerm = query;
+
+            // Check which searches are enabled
+            if (enableTerms.checked) {
+                // For terms, we use the first word or the whole query if it's a single term
+                const termQuery = query.split(/\s+(?:and|or|not)\s+/i)[0].trim();
+                fetchTerms(termQuery);
+            } else {
+                termsResults.innerHTML = '<p class="text-gray-400 text-center py-4">Term search disabled</p>';
+                termsCount.textContent = '';
+            }
+
+            if (enableStudies.checked) {
+                fetchStudies(query);
+            } else {
+                studiesResults.innerHTML = '<p class="text-gray-400 text-center py-4">Study search disabled</p>';
+                studiesCount.textContent = '';
+            }
+        }
+
+        // Event Listeners
+        const debouncedSearch = debounce(performSearch, DEBOUNCE_DELAY);
+        searchInput.addEventListener('input', debouncedSearch);
+
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                clearTimeout(searchTimeout);
+                performSearch();
+            }
+        });
+
+        enableTerms.addEventListener('change', () => {
+            if (currentSearchTerm) performSearch();
+        });
+
+        enableStudies.addEventListener('change', () => {
+            if (currentSearchTerm) performSearch();
+        });
+
+        loadAllTermsBtn.addEventListener('click', fetchAllTerms);
+
+        // Initialize with example
+        searchInput.placeholder = "Try 'amygdala' or 'hippocampus and memory'";
+    </script>
 </body>
 </html>
-
