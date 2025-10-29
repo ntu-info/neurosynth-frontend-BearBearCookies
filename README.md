@@ -51,11 +51,6 @@ A modern, responsive AJAX-based frontend for exploring neuroscience research ter
 - `/terms/<term>` - Get terms associated with a specific term
 - `/query/<query_string>/studies` - Logical search for studies
 
-## 💻 Local Development
-1. Clone the repository
-2. Open `index.html` in a web browser
-3. Start typing in the search box to see real-time results
-
 ## 🎨 Technologies Used
 - **Tailwind CSS** (via CDN) - Styling framework
 - **Font Awesome** (via CDN) - Icons
