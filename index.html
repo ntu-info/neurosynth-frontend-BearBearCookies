@@ -299,21 +299,27 @@
 
             // IMPROVED: Handle multiple response formats from the API
             let terms = [];
-            
+
             if (Array.isArray(data)) {
-                // If data is already an array, use it directly
+                // e.g., ["fear","anxiety", ...]
                 terms = data;
             } else if (data && typeof data === 'object') {
-                // If data is an object, try multiple possible property names
-                terms = data.terms || data.results || data.data || [];
-                
-                // If still empty, try to extract values from the object
-                if (terms.length === 0) {
-                    terms = Object.values(data).filter(v => 
-                        typeof v === 'string' || (typeof v === 'object' && (v.term || v.name))
-                    );
+                // First try common keys that already return arrays
+                if (Array.isArray(data.terms)) terms = data.terms;
+                else if (Array.isArray(data.results)) terms = data.results;
+                else if (Array.isArray(data.data)) terms = data.data;
+                else {
+                    // Fallback: flatten whatever the object holds
+                    const vals = Object.values(data);
+                    terms = vals.flatMap(v => {
+                        if (Array.isArray(v)) return v;                       // <-- FIX: keep arrays
+                        if (typeof v === 'string') return [v];
+                        if (v && typeof v === 'object' && (v.term || v.name)) return [v.term || v.name];
+                        return [];
+                    });
                 }
             }
+
 
             termsCount.textContent = `${terms.length} terms`;
 
